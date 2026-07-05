@@ -174,6 +174,11 @@
       <div class="field"><label>Título do calendário</label><input id="g-titulo" placeholder="Ex: Calendário Letivo 2026"></div>
       <div class="field"><label>Ano</label><input id="g-ano" type="number" value="2026" min="2000" max="2100"></div>
     </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn-soft" onclick="preencherFeriados()">🇧🇷 Preencher feriados nacionais do ano</button>
+      <button class="btn-soft" onclick="iniciarNovoAno()">✨ Começar um ano do zero</button>
+    </div>
+    <p class="hint" style="margin-top:10px;margin-bottom:0">O botão <b>Preencher feriados nacionais</b> insere automaticamente todos os feriados nacionais do ano informado — incluindo Carnaval, Paixão de Cristo e Corpus Christi, calculados para aquele ano. Você só precisa acrescentar o <b>feriado municipal</b> e as datas da instituição (períodos letivos, sábados letivos, avaliações e eventos).</p>
   </div>
 
   <!-- ETAPA 2 -->
@@ -436,6 +441,65 @@ function limparTudo(){
   renderPeriodos();renderEventos();
   document.getElementById('resultado').style.display='none';
   salvar();
+}
+
+// ---- feriados nacionais (cálculo automático para qualquer ano) ----
+function calcularPascoa(ano){
+  // Algoritmo de Meeus/Butcher (calendário gregoriano)
+  const a=ano%19,b=Math.floor(ano/100),c=ano%100;
+  const d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451);
+  const mes=Math.floor((h+l-7*m+114)/31),dia=((h+l-7*m+114)%31)+1;
+  return new Date(ano,mes-1,dia,12,0,0);
+}
+function iso(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')}
+function maisDias(dt,n){const x=new Date(dt);x.setDate(x.getDate()+n);return x}
+
+function feriadosNacionais(ano){
+  const pascoa=calcularPascoa(ano);
+  return [
+    {tipo:'feriado',ini:`${ano}-01-01`,fim:'',desc:'Confraternização Universal'},
+    {tipo:'recesso', ini:iso(maisDias(pascoa,-48)),fim:'',desc:'Recesso de Carnaval'},
+    {tipo:'feriado', ini:iso(maisDias(pascoa,-47)),fim:'',desc:'Carnaval'},
+    {tipo:'feriado', ini:iso(maisDias(pascoa,-2)), fim:'',desc:'Paixão de Cristo (Sexta-feira Santa)'},
+    {tipo:'feriado',ini:`${ano}-04-21`,fim:'',desc:'Tiradentes'},
+    {tipo:'feriado',ini:`${ano}-05-01`,fim:'',desc:'Dia do Trabalho'},
+    {tipo:'feriado', ini:iso(maisDias(pascoa,60)), fim:'',desc:'Corpus Christi'},
+    {tipo:'feriado',ini:`${ano}-09-07`,fim:'',desc:'Independência do Brasil'},
+    {tipo:'feriado',ini:`${ano}-10-12`,fim:'',desc:'Nossa Senhora Aparecida'},
+    {tipo:'feriado',ini:`${ano}-11-02`,fim:'',desc:'Finados'},
+    {tipo:'feriado',ini:`${ano}-11-15`,fim:'',desc:'Proclamação da República'},
+    {tipo:'feriado',ini:`${ano}-11-20`,fim:'',desc:'Consciência Negra'},
+    {tipo:'feriado',ini:`${ano}-12-25`,fim:'',desc:'Natal'}
+  ];
+}
+
+function preencherFeriados(){
+  const ano=parseInt(gv('g-ano'))||new Date().getFullYear();
+  const lista=feriadosNacionais(ano);
+  let add=0;
+  lista.forEach(f=>{
+    if(!eventos.some(e=>e.ini===f.ini&&e.desc===f.desc)){eventos.push(f);add++}
+  });
+  renderEventos();salvar();refreshSeVisivel();
+  alert(`✓ ${add} feriado(s) nacional(is) de ${ano} inserido(s).\n\nFalta você adicionar o feriado municipal e as datas da instituição (períodos letivos, sábados letivos, avaliações e eventos).`);
+}
+
+function iniciarNovoAno(){
+  const atual=new Date().getFullYear();
+  const resp=prompt('Para qual ano deseja montar o calendário do zero?', atual+1);
+  if(resp===null)return;
+  const ano=parseInt(resp);
+  if(!ano||ano<2000||ano>2100){alert('Ano inválido.');return}
+  if(!confirm(`Isso vai limpar os dados atuais e iniciar o calendário de ${ano} com os feriados nacionais já preenchidos. Continuar?\n\n(Dica: se quiser guardar o ano atual antes, cancele e use "Salvar dados (arquivo)".)`))return;
+  periodos=[];eventos=[];
+  sv('g-ano',ano);
+  sv('g-titulo','Calendário Letivo '+ano);
+  eventos=feriadosNacionais(ano);
+  renderPeriodos();renderEventos();gerar();
+  alert(`✓ Calendário de ${ano} iniciado com os feriados nacionais.\n\nAgora informe os PERÍODOS LETIVOS (etapa 2) e acrescente o feriado municipal, sábados letivos, avaliações e eventos da instituição (etapa 3).`);
 }
 
 function exportarDados(){
